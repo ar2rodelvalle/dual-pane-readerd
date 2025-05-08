@@ -24,11 +24,10 @@ export default function DualPaneReader() {
   const rightRef = useRef<HTMLDivElement>(null)
   const isSyncing = useRef(false)
 
-  // load sections (with sequence) + summaries
+  // load sections (with sequence) + summaries whenever ratio changes
   useEffect(() => {
     async function load() {
       const bookId = process.env.NEXT_PUBLIC_BOOK_ID!
-      // 1) fetch id, sequence, full_text
       const { data: secs, error: secErr } = await supabase
         .from('sections')
         .select('id, sequence, full_text')
@@ -37,7 +36,6 @@ export default function DualPaneReader() {
       if (secErr) return console.error(secErr)
 
       const ids = secs.map((s) => s.id)
-      // 2) fetch summaries for those section_ids & ratio
       const { data: sums, error: sumErr } = await supabase
         .from('summaries')
         .select('section_id, summary_text')
@@ -56,10 +54,12 @@ export default function DualPaneReader() {
       }))
 
       setSections(merged)
-      // preserve currentId if still present, else default to first
+
       if (merged.length) {
-        const exists = merged.some((s) => s.id === currentId)
-        setCurrentId(exists ? currentId : merged[0].id)
+        const firstId = merged[0].id
+        setCurrentId((prev) =>
+          merged.some((sec) => sec.id === prev) ? prev : firstId
+        )
       }
     }
     load()
@@ -97,7 +97,6 @@ export default function DualPaneReader() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-900 text-gray-100">
-      {/* Controls */}
       <div className="p-4 bg-gray-800 flex items-center space-x-4">
         <label className="font-medium">Section:</label>
         <select
@@ -116,7 +115,9 @@ export default function DualPaneReader() {
         <select
           className="bg-gray-700 border border-gray-600 rounded px-2 py-1"
           value={ratio}
-          onChange={(e) => setRatio(e.target.value as any)}
+          onChange={(e) =>
+            setRatio(e.target.value as '1:3' | '1:5' | '1:10')
+          }
         >
           <option value="1:3">1:3</option>
           <option value="1:5">1:5</option>
@@ -124,7 +125,6 @@ export default function DualPaneReader() {
         </select>
       </div>
 
-      {/* Panes */}
       <div className="flex flex-1 overflow-hidden">
         <div
           ref={leftRef}
